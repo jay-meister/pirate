@@ -7,5 +7,8 @@ defmodule PirateWeb.Router do
 
   scope "/api", PirateWeb do
     pipe_through :api
+
+    get "/", BookingController, :index
+    get "/stats", BookingController, :stats
   end
 end
