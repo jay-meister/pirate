@@ -89,17 +89,61 @@ defmodule Pirate.BookingsTest do
   end
 
   describe "list_studio_stats" do
-    test "returns map with stats_by_studio as well as earliest start and latest end" do
+    test "returns map with stats_by_studio map as well as earliest start and latest end" do
       assert %{
                stats_from: "2020-09-11T03:00:00.000Z",
                stats_to: "2020-09-14T05:00:00.000Z",
-               stats_by_studio: stats
+               stats_by_studio: %{}
              } = Bookings.list_studio_stats()
+    end
+  end
 
-      assert stats == %{
-               1 => 0.16216,
-               2 => 0.22973
-             }
+  describe "do_list_studio_stats - stats_by_studio calculation" do
+    test "handles empty data" do
+      data = []
+
+      assert %{
+               stats_from: nil,
+               stats_to: nil,
+               stats_by_studio: nil
+             } = Bookings.do_list_studio_stats(data)
+    end
+
+    test "returns 1.0 if studio booked for 100% of time" do
+      data = [
+        %{
+          "studioId" => 1,
+          "startsAt" => "2020-09-11T03:00:00.000Z",
+          "endsAt" => "2020-09-11T06:00:00.000Z"
+        }
+      ]
+
+      assert %{
+               stats_from: "2020-09-11T03:00:00.000Z",
+               stats_to: "2020-09-11T06:00:00.000Z",
+               stats_by_studio: %{1 => 1.0}
+             } = Bookings.do_list_studio_stats(data)
+    end
+
+    test "returns 0.5 if studio booked for 50% of time" do
+      data = [
+        %{
+          "studioId" => 1,
+          "startsAt" => "2020-09-11T03:00:00.000Z",
+          "endsAt" => "2020-09-11T06:00:00.000Z"
+        },
+        %{
+          "studioId" => 2,
+          "startsAt" => "2020-09-11T03:00:00.000Z",
+          "endsAt" => "2020-09-11T04:30:00.000Z"
+        }
+      ]
+
+      assert %{
+               stats_from: "2020-09-11T03:00:00.000Z",
+               stats_to: "2020-09-11T06:00:00.000Z",
+               stats_by_studio: %{1 => 1.0, 2 => 0.5}
+             } = Bookings.do_list_studio_stats(data)
     end
   end
 end

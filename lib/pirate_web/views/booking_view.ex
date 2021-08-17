@@ -13,7 +13,7 @@ defmodule PirateWeb.BookingView do
   def render("studio_stats.json", %{studio_stats: studio_stats}) do
     studio_stats
     |> Map.take([
-      :total_time,
+      :total_seconds,
       :stats_from,
       :stats_to,
       :stats_by_studio

@@ -14,7 +14,7 @@ defmodule Pirate.Bookings do
   end
 
   @doc """
-  Returns the requested page of results
+  Returns the requested page of results, defaults to page 1
   """
   def list_booked_bookings(params) do
     params = build_paginate_params(params)
@@ -53,41 +53,58 @@ defmodule Pirate.Bookings do
   each studio has been booked for from it's first booked day of operation
   """
   def list_studio_stats() do
+    data = list_parsed_data()
+
+    do_list_studio_stats(data)
+  end
+
+  def do_list_studio_stats([]),
+    do: %{
+      total_seconds: nil,
+      stats_from: nil,
+      stats_to: nil,
+      stats_by_studio: nil
+    }
+
+  def do_list_studio_stats(data) do
     accumulator = %{
-      earliest: nil,
-      latest: nil,
+      earliest_start: nil,
+      latest_end: nil,
       seconds_by_studio: %{}
     }
 
     accumulated =
-      list_parsed_data()
+      data
       |> Enum.reduce(accumulator, &reduce_stats/2)
 
-    total_time = DateTime.diff(accumulated.latest, accumulated.earliest)
+    total_seconds = DateTime.diff(accumulated.latest_end, accumulated.earliest_start)
 
     %{
-      total_time: total_time,
-      stats_from: DateTime.to_iso8601(accumulated.earliest),
-      stats_to: DateTime.to_iso8601(accumulated.latest),
+      total_seconds: total_seconds,
+      stats_from: DateTime.to_iso8601(accumulated.earliest_start),
+      stats_to: DateTime.to_iso8601(accumulated.latest_end),
       stats_by_studio:
-        Map.new(accumulated.seconds_by_studio, fn {studio_id, total_seconds} ->
-          {studio_id,
-           total_seconds
-           |> Decimal.div(total_time)
-           |> Decimal.round(5)
-           |> Decimal.to_float()}
+        Map.new(accumulated.seconds_by_studio, fn {studio_id, studio_seconds} ->
+          {studio_id, divide_to_decimal(studio_seconds, total_seconds)}
         end)
     }
   end
 
-  def reduce_stats(
-        %{
-          "studioId" => studio_id,
-          "startsAt" => starts_at_str,
-          "endsAt" => ends_at_str
-        },
-        accumulator
-      ) do
+  defp divide_to_decimal(studio_seconds, total_seconds) do
+    studio_seconds
+    |> Decimal.div(total_seconds)
+    |> Decimal.round(5)
+    |> Decimal.to_float()
+  end
+
+  defp reduce_stats(
+         %{
+           "studioId" => studio_id,
+           "startsAt" => starts_at_str,
+           "endsAt" => ends_at_str
+         },
+         accumulator
+       ) do
     {:ok, starts_at, 0} = DateTime.from_iso8601(starts_at_str)
     {:ok, ends_at, 0} = DateTime.from_iso8601(ends_at_str)
 
@@ -102,8 +119,8 @@ defmodule Pirate.Bookings do
       )
 
     accumulator
-    |> Map.update!(:earliest, &take_earliest(&1, starts_at))
-    |> Map.update!(:latest, &take_latest(&1, ends_at))
+    |> Map.update!(:earliest_start, &take_earliest(&1, starts_at))
+    |> Map.update!(:latest_end, &take_latest(&1, ends_at))
     |> Map.put(:seconds_by_studio, seconds_by_studio)
   end
 
